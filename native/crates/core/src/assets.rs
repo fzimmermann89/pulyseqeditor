@@ -78,12 +78,12 @@ fn collect_embedded_files(
     files: &mut Vec<String>,
 ) {
     if normalized_prefix.is_empty() {
-        collect_files_recursive(root.entries(), normalized_prefix, files);
+        collect_files_recursive(root.entries(), files);
         return;
     }
 
     if let Some(dir) = root.get_dir(normalized_prefix) {
-        collect_files_recursive(dir.entries(), normalized_prefix, files);
+        collect_files_recursive(dir.entries(), files);
         return;
     }
 
@@ -94,29 +94,14 @@ fn collect_embedded_files(
 
 fn collect_files_recursive(
     entries: &'static [DirEntry<'static>],
-    root_prefix: &str,
     files: &mut Vec<String>,
 ) {
     for entry in entries {
         match entry {
-            DirEntry::Dir(dir) => collect_files_recursive(dir.entries(), root_prefix, files),
+            DirEntry::Dir(dir) => collect_files_recursive(dir.entries(), files),
             DirEntry::File(file) => {
-                let relative_path =
-                    join_embedded_prefix(root_prefix, file.path().to_string_lossy().as_ref());
-                files.push(relative_path);
+                files.push(normalize_relative_path(&file.path().to_string_lossy()));
             }
         }
-    }
-}
-
-fn join_embedded_prefix(prefix: &str, child_path: &str) -> String {
-    let prefix = prefix.trim_end_matches('/');
-    let child_path = child_path.trim_start_matches('/');
-    if prefix.is_empty() {
-        child_path.to_string()
-    } else if child_path.is_empty() {
-        prefix.to_string()
-    } else {
-        format!("{prefix}/{child_path}")
     }
 }
