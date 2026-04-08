@@ -7,7 +7,6 @@ import runtimeExecutionSource from "../python_runtime/pypulseq_runtime/execution
 import runtimeFilesystemHostSource from "../python_runtime/pypulseq_runtime/filesystem_host.py?raw";
 import runtimeHostSource from "../python_runtime/pypulseq_runtime/host.py?raw";
 import runtimeJsBridgeHostSource from "../python_runtime/pypulseq_runtime/js_bridge_host.py?raw";
-import runtimeNativeBootstrapSource from "../python_runtime/pypulseq_runtime/native_bootstrap.py?raw";
 import runtimeNativeRunnerSource from "../python_runtime/pypulseq_runtime/native_runner.py?raw";
 import runtimePatchMatplotlibSource from "../python_runtime/pypulseq_runtime/patch_matplotlib.py?raw";
 import runtimePatchPypulseqSource from "../python_runtime/pypulseq_runtime/patch_pypulseq.py?raw";
@@ -43,7 +42,6 @@ const SHARED_RUNTIME_FILES = [
   { path: `${SHARED_RUNTIME_ROOT}/filesystem_host.py`, source: runtimeFilesystemHostSource },
   { path: `${SHARED_RUNTIME_ROOT}/host.py`, source: runtimeHostSource },
   { path: `${SHARED_RUNTIME_ROOT}/js_bridge_host.py`, source: runtimeJsBridgeHostSource },
-  { path: `${SHARED_RUNTIME_ROOT}/native_bootstrap.py`, source: runtimeNativeBootstrapSource },
   { path: `${SHARED_RUNTIME_ROOT}/native_runner.py`, source: runtimeNativeRunnerSource },
   { path: `${SHARED_RUNTIME_ROOT}/patch_matplotlib.py`, source: runtimePatchMatplotlibSource },
   { path: `${SHARED_RUNTIME_ROOT}/patch_pypulseq.py`, source: runtimePatchPypulseqSource },

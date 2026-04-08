@@ -327,6 +327,7 @@ fn op_pulseq_write_output_base64(
             path.display()
         )))
     })?;
+    println!("Wrote {}", path.display());
     Ok(path.display().to_string())
 }
 

@@ -44,7 +44,7 @@ jobs:
         id: flags
         shell: bash
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && ( "${GITHUB_REF}" == "refs/heads/main" || "${GITHUB_REF}" == refs/tags/v* ) ]]; then
             echo "pages_enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "pages_enabled=false" >> "$GITHUB_OUTPUT"

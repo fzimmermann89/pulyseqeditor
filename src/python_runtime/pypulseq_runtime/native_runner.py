@@ -3,7 +3,8 @@ import os
 from pathlib import Path
 
 from .execution import execute_script_file, reset_run_state
-from .native_bootstrap import install_native_runtime
+from .js_bridge_host import JsBridgeHost
+from .runtime import install_runtime
 
 
 def run_native_script(
@@ -21,7 +22,7 @@ def run_native_script(
     )
     script_args = list(script_args or [])
 
-    install_native_runtime(namespace=namespace)
+    install_runtime(JsBridgeHost(), namespace=namespace)
     state = namespace["_pybridge_state"]
     export_open_figures = namespace["_export_open_figures"]
     reset_run_state(state)
