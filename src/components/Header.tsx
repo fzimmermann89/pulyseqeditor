@@ -1,4 +1,5 @@
 import { RunButton } from "./RunButton";
+import packageJson from "../../package.json";
 
 type HeaderProps = {
   status: string;
@@ -11,6 +12,7 @@ type HeaderProps = {
 
 export function Header({ status, busy, onRun, canInstall, installSupported, onInstall }: HeaderProps) {
   const iconUrl = `${import.meta.env.BASE_URL}pulseq-icon.png`;
+  const pypulseqVersion = packageJson.pypulseq.version;
 
   return (
     <header className="header">
@@ -21,6 +23,7 @@ export function Header({ status, busy, onRun, canInstall, installSupported, onIn
           className="header-logo-img"
         />
         <span className="header-title">pypulseq</span>
+        <span className="header-version">{pypulseqVersion}</span>
         <button
           type="button"
           className="install-button"
