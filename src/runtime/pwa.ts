@@ -12,6 +12,12 @@ type PwaInstallState = {
   supported: boolean;
 };
 
+declare global {
+  interface Window {
+    __PULSEQ_NATIVE_GUI__?: boolean;
+  }
+}
+
 const BASE_URL = import.meta.env.BASE_URL;
 const withBase = (relativePath: string) => `${BASE_URL}${relativePath}`;
 
@@ -51,6 +57,9 @@ let initialized = false;
 const listeners = new Set<(state: PwaInstallState) => void>();
 
 function isWebPwaEnvironment() {
+  if (window.__PULSEQ_NATIVE_GUI__ === true) {
+    return false;
+  }
   return window.location.protocol === "http:" || window.location.protocol === "https:";
 }
 

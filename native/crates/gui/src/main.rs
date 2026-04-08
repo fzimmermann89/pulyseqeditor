@@ -116,6 +116,7 @@ fn launch_gui() -> Result<(), String> {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
         .with_title("pypulseq")
+        .with_maximized(true)
         .build(&event_loop)
         .map_err(|error| format!("failed to create GUI window: {error}"))?;
 
@@ -133,6 +134,7 @@ fn launch_gui() -> Result<(), String> {
         })
         .with_initialization_script(
             r#"
+            window.__PULSEQ_NATIVE_GUI__ = true;
             window.addEventListener("error", (event) => {
               const message = event.error?.stack || event.message || "unknown window error";
               window.ipc.postMessage(`window-error:${message}`);

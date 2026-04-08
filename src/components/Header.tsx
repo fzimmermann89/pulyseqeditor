@@ -33,29 +33,31 @@ export function Header({
         />
         <span className="header-title">pypulseq</span>
         <span className="header-version">{pypulseqVersion}</span>
-        <button
-          type="button"
-          className="install-button"
-          aria-label="Install app"
-          title={canInstall ? "Install" : installSupported ? "Install unavailable" : "Install not supported"}
-          onClick={onInstall}
-          disabled={!canInstall}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            className="install-icon"
+        {installSupported ? (
+          <button
+            type="button"
+            className="install-button"
+            aria-label="Install app"
+            title={canInstall ? "Install" : "Install unavailable"}
+            onClick={onInstall}
+            disabled={!canInstall}
           >
-            <path
-              d="M12 3v10m0 0 4-4m-4 4-4-4M5 17v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className="install-icon"
+            >
+              <path
+                d="M12 3v10m0 0 4-4m-4 4-4-4M5 17v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : null}
       </div>
 
       <div className="header-controls">
