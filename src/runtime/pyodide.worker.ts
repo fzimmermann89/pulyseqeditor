@@ -4,7 +4,11 @@ import loadPypulseqSource from "../py/load_pypulseq.py?raw";
 import runtimeInitSource from "../python_runtime/pypulseq_runtime/__init__.py?raw";
 import runtimeBridgeApiSource from "../python_runtime/pypulseq_runtime/bridge_api.py?raw";
 import runtimeExecutionSource from "../python_runtime/pypulseq_runtime/execution.py?raw";
+import runtimeFilesystemHostSource from "../python_runtime/pypulseq_runtime/filesystem_host.py?raw";
 import runtimeHostSource from "../python_runtime/pypulseq_runtime/host.py?raw";
+import runtimeJsBridgeHostSource from "../python_runtime/pypulseq_runtime/js_bridge_host.py?raw";
+import runtimeNativeBootstrapSource from "../python_runtime/pypulseq_runtime/native_bootstrap.py?raw";
+import runtimeNativeRunnerSource from "../python_runtime/pypulseq_runtime/native_runner.py?raw";
 import runtimePatchMatplotlibSource from "../python_runtime/pypulseq_runtime/patch_matplotlib.py?raw";
 import runtimePatchPypulseqSource from "../python_runtime/pypulseq_runtime/patch_pypulseq.py?raw";
 import runtimeRuntimeSource from "../python_runtime/pypulseq_runtime/runtime.py?raw";
@@ -36,7 +40,11 @@ const SHARED_RUNTIME_FILES = [
   { path: `${SHARED_RUNTIME_ROOT}/__init__.py`, source: runtimeInitSource },
   { path: `${SHARED_RUNTIME_ROOT}/bridge_api.py`, source: runtimeBridgeApiSource },
   { path: `${SHARED_RUNTIME_ROOT}/execution.py`, source: runtimeExecutionSource },
+  { path: `${SHARED_RUNTIME_ROOT}/filesystem_host.py`, source: runtimeFilesystemHostSource },
   { path: `${SHARED_RUNTIME_ROOT}/host.py`, source: runtimeHostSource },
+  { path: `${SHARED_RUNTIME_ROOT}/js_bridge_host.py`, source: runtimeJsBridgeHostSource },
+  { path: `${SHARED_RUNTIME_ROOT}/native_bootstrap.py`, source: runtimeNativeBootstrapSource },
+  { path: `${SHARED_RUNTIME_ROOT}/native_runner.py`, source: runtimeNativeRunnerSource },
   { path: `${SHARED_RUNTIME_ROOT}/patch_matplotlib.py`, source: runtimePatchMatplotlibSource },
   { path: `${SHARED_RUNTIME_ROOT}/patch_pypulseq.py`, source: runtimePatchPypulseqSource },
   { path: `${SHARED_RUNTIME_ROOT}/runtime.py`, source: runtimeRuntimeSource },

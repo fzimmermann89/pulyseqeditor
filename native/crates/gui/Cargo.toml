@@ -6,3 +6,6 @@ license.workspace = true
 
 [dependencies]
 pypulseq-native-core = { path = "../core" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+wry = "0.48.1"

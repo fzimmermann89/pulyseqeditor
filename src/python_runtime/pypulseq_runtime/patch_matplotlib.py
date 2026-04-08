@@ -31,10 +31,24 @@ def export_open_figures(host: HostBridge, state):
         return
 
     state["show_called"] = True
+    preferred_plot_format = None
+    with contextlib.suppress(Exception):
+        preferred_plot_format = host.preferred_plot_format()
 
     for figure_index, figure_number in enumerate(figure_numbers):
         figure = plt.figure(figure_number)
         title = figure_title(figure, figure_index)
+
+        if preferred_plot_format == "png":
+            png_buffer = io.BytesIO()
+            figure.savefig(png_buffer, format="png", bbox_inches="tight")
+            host.emit_plot(
+                figure_index=figure_index,
+                title=title,
+                mime="image/png",
+                data=base64.b64encode(png_buffer.getvalue()).decode("ascii"),
+            )
+            continue
 
         svg_buffer = io.StringIO()
         try:

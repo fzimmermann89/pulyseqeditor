@@ -11,8 +11,10 @@
     "ensure:pyodide": "node ./scripts/ensure-pyodide.mjs",
     "ensure:pypulseq": "node ./scripts/ensure-pypulseq.mjs",
     "sync:pypulseq": "node ./scripts/sync-pypulseq.mjs",
+    "stage:native-runtime": "node ./scripts/stage-native-runtime.mjs",
     "dev": "npm run ensure:pyodide && npm run ensure:pypulseq && npm run sync:pypulseq && vite",
     "build": "npm run ensure:pyodide && npm run ensure:pypulseq && npm run sync:pypulseq && tsc -b && vite build",
+    "build:native-assets": "npm run build && npm run stage:native-runtime",
     "preview": "vite preview"
   },
   "dependencies": {

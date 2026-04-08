@@ -1,14 +1,16 @@
-name: Windows Native
+name: Native Release
 
 on:
   push:
-    branches: ["main", "next"]
-  pull_request:
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,14 +64,17 @@ jobs:
           Copy-Item native/runtime/manifest.json native/out/pypulseq-gui/runtime/
           Copy-Item -Recurse native/runtime/gui native/out/pypulseq-gui/runtime/
 
-      - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pypulseq-cli-windows
-          path: native/out/pypulseq-cli
+      - name: Archive CLI bundle
+        shell: pwsh
+        run: Compress-Archive -Path native/out/pypulseq-cli/* -DestinationPath native/out/pypulseq-cli-windows.zip
 
-      - name: Upload GUI artifact
-        uses: actions/upload-artifact@v4
+      - name: Archive GUI bundle
+        shell: pwsh
+        run: Compress-Archive -Path native/out/pypulseq-gui/* -DestinationPath native/out/pypulseq-gui-windows.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
         with:
-          name: pypulseq-gui-windows
-          path: native/out/pypulseq-gui
+          files: |
+            native/out/pypulseq-cli-windows.zip
+            native/out/pypulseq-gui-windows.zip

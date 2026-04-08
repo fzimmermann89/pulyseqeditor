@@ -1,44 +1,87 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use pypulseq_native_core::assets::RuntimePaths;
+use pypulseq_native_core::host::ConsoleHost;
+use pypulseq_native_core::launch::NativeLaunchSpec;
+use pypulseq_native_core::runtime::{RunRequest, run_python_script};
 
 #[derive(Debug)]
 struct Cli {
     script: PathBuf,
+    output_dir: Option<PathBuf>,
     script_args: Vec<String>,
+    copy_paths: Vec<PathBuf>,
+    verbose: bool,
 }
 
 fn parse_args() -> Result<Cli, String> {
     let mut args = std::env::args_os();
     let _binary = args.next();
 
-    let Some(script) = args.next() else {
-        return Err("usage: pypulseq-cli <script.py> [script args ...]".to_string());
+    let mut output_dir = None;
+    let mut script = None;
+    let mut script_args = Vec::new();
+    let mut copy_paths = Vec::new();
+    let mut verbose = false;
+
+    while let Some(argument) = args.next() {
+        if script.is_none() {
+            if argument == "--output-dir" {
+                let Some(value) = args.next() else {
+                    return Err("missing value for --output-dir".to_string());
+                };
+                output_dir = Some(PathBuf::from(value));
+                continue;
+            }
+
+            if argument == "--verbose" {
+                verbose = true;
+                continue;
+            }
+
+            if argument == "--copy" {
+                let Some(value) = args.next() else {
+                    return Err("missing value for --copy".to_string());
+                };
+                copy_paths.push(PathBuf::from(value));
+                continue;
+            }
+
+            if argument == "--help" || argument == "-h" {
+                return Err(
+                    "usage: pypulseq-cli [--output-dir DIR] [--copy PATH] [--verbose] <script.py> [script args ...]"
+                        .to_string(),
+                );
+            }
+
+            script = Some(PathBuf::from(argument));
+            continue;
+        }
+
+        script_args.push(argument.to_string_lossy().into_owned());
+    }
+
+    let Some(script) = script else {
+        return Err(
+            "usage: pypulseq-cli [--output-dir DIR] [--copy PATH] [--verbose] <script.py> [script args ...]"
+                .to_string(),
+        );
     };
 
     Ok(Cli {
-        script: PathBuf::from(script),
-        script_args: args.map(|arg| arg.to_string_lossy().into_owned()).collect(),
+        script,
+        output_dir,
+        script_args,
+        copy_paths,
+        verbose,
     })
 }
 
-fn validate_script(path: &Path) -> Result<(), String> {
-    if !path.exists() {
-        return Err(format!("script does not exist: {}", path.display()));
-    }
-    if !path.is_file() {
-        return Err(format!("script is not a file: {}", path.display()));
-    }
-    Ok(())
-}
-
 fn runtime_root() -> Result<PathBuf, String> {
-    let exe_dir = std::env::current_exe()
-        .map_err(|error| format!("failed to resolve current executable path: {error}"))?
-        .parent()
-        .ok_or_else(|| "failed to resolve executable directory".to_string())?
-        .to_path_buf();
-    Ok(exe_dir.join("runtime"))
+    let executable_path = std::env::current_exe()
+        .map_err(|error| format!("failed to resolve current executable path: {error}"))?;
+    let runtime_paths = RuntimePaths::locate_from_executable(executable_path)?;
+    Ok(runtime_paths.root)
 }
 
 fn main() {
@@ -50,22 +93,18 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let cli = parse_args()?;
-    validate_script(&cli.script)?;
 
     let runtime_paths = RuntimePaths::from_root(runtime_root()?);
-
-    println!("{}", pypulseq_native_core::banner("cli"));
-    println!("script: {}", cli.script.display());
-    if !cli.script_args.is_empty() {
-        println!("script args: {}", cli.script_args.join(" "));
-    }
-    println!("runtime root: {}", runtime_paths.root.display());
-    println!("pyodide dir: {}", runtime_paths.pyodide_dir.display());
-    println!(
-        "python packages archive: {}",
-        runtime_paths.python_packages_archive.display()
-    );
-    println!("CLI host scaffolding is in place. Native Pyodide execution is not implemented yet.");
+    let launch_spec = NativeLaunchSpec::for_script(
+        &cli.script,
+        cli.script_args.clone(),
+        cli.output_dir,
+        cli.copy_paths,
+        cli.verbose,
+    )?;
+    let request: RunRequest = launch_spec.into_run_request();
+    let mut host = ConsoleHost::new(cli.verbose);
+    let _summary = run_python_script(&request, &runtime_paths, &mut host)?;
 
     Ok(())
 }
