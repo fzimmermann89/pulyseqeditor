@@ -1,0 +1,500 @@
+:root {
+  --bg-base: #0f1117;
+  --bg-surface: #161822;
+  --bg-raised: #1c1f2e;
+  --bg-console: #0c0e14;
+  --bg-header: #13151f;
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.1);
+
+  --text-primary: #e2dfd8;
+  --text-secondary: #8a8697;
+  --text-muted: #5c586a;
+
+  --accent: #e8a045;
+  --accent-hover: #f0b55e;
+  --accent-glow: rgba(232, 160, 69, 0.15);
+
+  --status-ready: #4aba6a;
+  --status-running: #e8a045;
+  --status-error: #e85454;
+  --status-loading: #6b8aed;
+
+  --font-ui: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  --header-h: 52px;
+  --console-collapsed-h: 36px;
+  --console-expanded-h: 220px;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+/* ─── App Layout ──────────────────────────────────────── */
+
+.app-layout {
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Header ──────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.25rem;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-subtle);
+  z-index: 10;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-right: auto;
+}
+
+.header-logo-img {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+.header-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.install-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.install-button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-subtle);
+}
+
+.install-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.install-button:disabled:hover {
+  color: var(--text-secondary);
+  background: transparent;
+  border-color: transparent;
+}
+
+.install-icon {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ─── Status Indicator (in header) ────────────────────── */
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.status-indicator[data-status="ready"] .status-dot {
+  background: var(--status-ready);
+  box-shadow: 0 0 6px var(--status-ready);
+}
+
+.status-indicator[data-status="running"] .status-dot {
+  background: var(--status-running);
+  box-shadow: 0 0 6px var(--status-running);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+.status-indicator[data-status="loading"] .status-dot,
+.status-indicator[data-status="warming"] .status-dot {
+  background: var(--status-loading);
+  box-shadow: 0 0 6px var(--status-loading);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.status-indicator[data-status="completed"] .status-dot {
+  background: var(--status-ready);
+  box-shadow: 0 0 6px var(--status-ready);
+}
+
+.status-indicator[data-status="failed"] .status-dot {
+  background: var(--status-error);
+  box-shadow: 0 0 6px var(--status-error);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ─── Buttons ─────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.btn-run {
+  background: linear-gradient(135deg, var(--accent), #d4872e);
+  color: #0f1117;
+  font-weight: 600;
+}
+
+.btn-run:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-hover), #e09a3a);
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.btn-run:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-run .shortcut-hint {
+  font-size: 0.65rem;
+  opacity: 0.6;
+  font-weight: 400;
+  margin-left: 0.15rem;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(15, 17, 23, 0.3);
+  border-top-color: #0f1117;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Editor Panel ────────────────────────────────────── */
+
+.editor-panel {
+  overflow: hidden;
+  background: var(--bg-base);
+  position: relative;
+}
+
+.editor-panel .cm-editor {
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.editor-panel .cm-editor.cm-focused {
+  outline: none;
+}
+
+.editor-panel .cm-scroller {
+  overflow: auto;
+  font-family: var(--font-mono) !important;
+}
+
+.editor-panel .cm-gutters {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  min-width: 3.5rem;
+}
+
+.editor-panel .cm-activeLineGutter {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+}
+
+.editor-panel .cm-activeLine {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.editor-panel .cm-cursor {
+  border-left-color: var(--accent);
+}
+
+.editor-panel .cm-selectionBackground {
+  background: rgba(232, 160, 69, 0.15) !important;
+}
+
+.editor-panel .cm-editor .cm-selectionMatch {
+  background: rgba(232, 160, 69, 0.1);
+}
+
+.editor-panel .cm-matchingBracket {
+  background: rgba(232, 160, 69, 0.25);
+  color: var(--accent) !important;
+}
+
+/* ─── Console Drawer ──────────────────────────────────── */
+
+.console-drawer {
+  background: var(--bg-console);
+  border-top: 1px solid var(--border-medium);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+
+.console-drawer.collapsed {
+  height: var(--console-collapsed-h);
+}
+
+.console-drawer.expanded {
+  height: var(--console-expanded-h);
+}
+
+.console-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  height: var(--console-collapsed-h);
+  min-height: var(--console-collapsed-h);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.console-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.console-header-title {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.console-toggle {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+  margin-left: 0.5rem;
+}
+
+.console-drawer.expanded .console-toggle {
+  transform: rotate(180deg);
+}
+
+.console-entry-count {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1rem 0.45rem;
+  border-radius: 100px;
+}
+
+.console-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.console-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.console-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.console-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.console-line {
+  padding: 0.1rem 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.console-line.stdout {
+  color: var(--text-primary);
+}
+
+.console-line.stderr {
+  color: var(--status-error);
+}
+
+.console-line.info {
+  color: var(--accent);
+}
+
+.console-empty {
+  padding: 0.5rem 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ─── Console Clear Button ────────────────────────────── */
+
+.console-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-console-clear {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-console-clear:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Resize Handle ───────────────────────────────────── */
+
+.console-resize-handle {
+  height: 3px;
+  cursor: ns-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.console-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border-medium);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.console-resize-handle:hover::after,
+.console-resize-handle.dragging::after {
+  opacity: 1;
+}
+
+/* ─── Animations ──────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.app-layout {
+  animation: fade-in 0.3s ease;
+}

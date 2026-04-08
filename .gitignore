@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.vite/
+tsconfig.tsbuildinfo
+.cache/
+public/pyodide/
+public/python_packages/
+public/python_packages.zip
+
+.codex
+.cursor/
+.DS_Store
+Thumbs.db
