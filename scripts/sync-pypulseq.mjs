@@ -104,7 +104,7 @@ async function writeDistInfo(version) {
 async function writeArchive() {
   await rm(archivePath, { force: true });
   await mkdir(path.dirname(archivePath), { recursive: true });
-  await execFileAsync("zip", ["-qr", archivePath, "."], {
+  await execFileAsync("tar", ["-a", "-cf", archivePath, "."], {
     cwd: buildPackagesRoot,
   });
 }
