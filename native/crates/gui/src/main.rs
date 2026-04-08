@@ -52,13 +52,40 @@ fn launch_gui() -> Result<(), String> {
 
     fn resolve_request_path(path: &str) -> String {
         let trimmed = path.trim_start_matches('/');
-        if trimmed.is_empty() {
+        let normalized = strip_pages_prefix(trimmed);
+
+        if normalized == "favicon.ico" {
+            return format!("{GUI_DIR_NAME}/pulseq-icon.png");
+        }
+        if normalized.is_empty() {
             return format!("{GUI_DIR_NAME}/index.html");
         }
-        if trimmed.starts_with("pyodide/") || trimmed == PYTHON_PACKAGES_ARCHIVE_NAME {
-            return trimmed.to_string();
+        if normalized.starts_with("pyodide/") || normalized == PYTHON_PACKAGES_ARCHIVE_NAME {
+            return normalized.to_string();
         }
-        format!("{GUI_DIR_NAME}/{trimmed}")
+        format!("{GUI_DIR_NAME}/{normalized}")
+    }
+
+    fn strip_pages_prefix(path: &str) -> &str {
+        if let Some((_, remainder)) = path.split_once('/') {
+            if should_strip_prefix(remainder) {
+                return remainder;
+            }
+        }
+        path
+    }
+
+    fn should_strip_prefix(path: &str) -> bool {
+        path == "manifest.webmanifest"
+            || path == "logo.png"
+            || path == "pulseq-icon.png"
+            || path == "pwa-192.png"
+            || path == "pwa-512.png"
+            || path == "sw.js"
+            || path == "favicon.ico"
+            || path == PYTHON_PACKAGES_ARCHIVE_NAME
+            || path.starts_with("assets/")
+            || path.starts_with("pyodide/")
     }
 
     fn response_from_path(runtime: &EmbeddedRuntime, relative_path: &str) -> Response<Cow<'static, [u8]>> {
