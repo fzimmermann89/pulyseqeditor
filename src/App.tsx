@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type ChangeEvent, type DragEvent } from "react";
 import { CodeEditor } from "./components/CodeEditor";
 import { ConsolePanel } from "./components/ConsolePanel";
 import { Header } from "./components/Header";
@@ -28,6 +28,9 @@ export default function App() {
   const [status, setStatus] = useState("Idle");
   const [canInstallPwa, setCanInstallPwa] = useState(false);
   const [installSupported, setInstallSupported] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragDepthRef = useRef(0);
 
   useEffect(() => {
     installBridge({
@@ -75,6 +78,82 @@ export default function App() {
     };
   }, [busy]);
 
+  const loadSourceFile = useCallback(async (file: File) => {
+    const text = await file.text();
+    setCode(text);
+    setStatus(`Loaded ${file.name}`);
+    setEntries((current) => [
+      ...current,
+      makeConsoleEntry({
+        stream: "info",
+        text: `Loaded ${file.name}\n`,
+      }),
+    ]);
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelection = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        await loadSourceFile(file);
+      } finally {
+        event.target.value = "";
+      }
+    },
+    [loadSourceFile],
+  );
+
+  const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setDragActive(true);
+  }, []);
+
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (event: DragEvent<HTMLDivElement>) => {
+      if (!event.dataTransfer.types.includes("Files")) return;
+      event.preventDefault();
+      dragDepthRef.current = 0;
+      setDragActive(false);
+      const file = event.dataTransfer.files.item(0);
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".py")) {
+        setEntries((current) => [
+          ...current,
+          makeConsoleEntry({
+            stream: "stderr",
+            text: "Only .py files can be opened.\n",
+          }),
+        ]);
+        setStatus("Failed");
+        return;
+      }
+      await loadSourceFile(file);
+    },
+    [loadSourceFile],
+  );
+
   const handleRun = useCallback(async () => {
     setBusy(true);
     setEntries([]);
@@ -100,10 +179,24 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app-layout">
+    <div
+      className={`app-layout${dragActive ? " app-layout-dragging" : ""}`}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".py,text/x-python,text/plain"
+        className="hidden-file-input"
+        onChange={handleFileSelection}
+      />
       <Header
         status={status}
         busy={busy}
+        onOpen={handleOpen}
         onRun={handleRun}
         canInstall={canInstallPwa}
         installSupported={installSupported}
@@ -116,6 +209,11 @@ export default function App() {
         onRun={handleRun}
       />
       <ConsolePanel entries={entries} onClear={() => setEntries([])} />
+      {dragActive ? (
+        <div className="drop-overlay" aria-hidden="true">
+          <div className="drop-overlay-card">Drop a Python file to open it</div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -4,13 +4,22 @@ import packageJson from "../../package.json";
 type HeaderProps = {
   status: string;
   busy: boolean;
+  onOpen: () => void;
   onRun: () => void;
   canInstall: boolean;
   installSupported: boolean;
   onInstall: () => void;
 };
 
-export function Header({ status, busy, onRun, canInstall, installSupported, onInstall }: HeaderProps) {
+export function Header({
+  status,
+  busy,
+  onOpen,
+  onRun,
+  canInstall,
+  installSupported,
+  onInstall,
+}: HeaderProps) {
   const iconUrl = `${import.meta.env.BASE_URL}pulseq-icon.png`;
   const pypulseqVersion = packageJson.pypulseq.version;
 
@@ -54,6 +63,9 @@ export function Header({ status, busy, onRun, canInstall, installSupported, onIn
           <span className="status-dot" />
           {status}
         </span>
+        <button type="button" className="btn btn-secondary" onClick={onOpen} disabled={busy}>
+          Open
+        </button>
         <RunButton onClick={onRun} busy={busy} disabled={busy} />
       </div>
     </header>
