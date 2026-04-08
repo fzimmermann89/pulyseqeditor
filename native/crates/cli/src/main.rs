@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use pypulseq_native_core::assets::RuntimePaths;
 use pypulseq_native_core::host::ConsoleHost;
 use pypulseq_native_core::launch::NativeLaunchSpec;
 use pypulseq_native_core::runtime::{RunRequest, run_python_script};
@@ -77,13 +76,6 @@ fn parse_args() -> Result<Cli, String> {
     })
 }
 
-fn runtime_root() -> Result<PathBuf, String> {
-    let executable_path = std::env::current_exe()
-        .map_err(|error| format!("failed to resolve current executable path: {error}"))?;
-    let runtime_paths = RuntimePaths::locate_from_executable(executable_path)?;
-    Ok(runtime_paths.root)
-}
-
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -93,8 +85,6 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let cli = parse_args()?;
-
-    let runtime_paths = RuntimePaths::from_root(runtime_root()?);
     let launch_spec = NativeLaunchSpec::for_script(
         &cli.script,
         cli.script_args.clone(),
@@ -104,7 +94,7 @@ fn run() -> Result<(), String> {
     )?;
     let request: RunRequest = launch_spec.into_run_request();
     let mut host = ConsoleHost::new(cli.verbose);
-    let _summary = run_python_script(&request, &runtime_paths, &mut host)?;
+    let _summary = run_python_script(&request, &mut host)?;
 
     Ok(())
 }

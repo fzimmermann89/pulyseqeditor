@@ -1,17 +1,27 @@
-use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Mutex, OnceLock};
 
 use deno_core::error::OpError;
+use deno_core::error::ModuleLoaderError;
 use deno_core::extension;
-use deno_core::FsModuleLoader;
 use deno_core::JsRuntime;
+use deno_core::ModuleLoadResponse;
+use deno_core::ModuleLoader;
 use deno_core::ModuleSpecifier;
+use deno_core::ModuleSource;
+use deno_core::ModuleSourceCode;
+use deno_core::ModuleType;
 use deno_core::op2;
 use deno_core::PollEventLoopOptions;
+use deno_core::RequestedModuleType;
+use deno_core::ResolutionKind;
 use deno_core::RuntimeOptions;
+use deno_core::resolve_import;
 
-use crate::assets::RuntimePaths;
+use crate::assets::{
+    EMBEDDED_RUNTIME_ORIGIN, EmbeddedRuntime, embedded_asset_path_from_specifier,
+    embedded_asset_url,
+};
 use crate::runtime::NativeBootstrapPlan;
 
 #[derive(Clone, Debug)]
@@ -65,6 +75,18 @@ fn current_verbose() -> Result<bool, OpError> {
 fn op_pulseq_read_file_bytes(
     #[string] specifier: String,
 ) -> Result<Vec<u8>, OpError> {
+    if let Some(relative_path) = embedded_asset_path_from_specifier(&specifier) {
+        let embedded_runtime = EmbeddedRuntime::new();
+        let bytes = embedded_runtime
+            .file_bytes(&relative_path)
+            .ok_or_else(|| {
+                OpError::from(std::io::Error::other(format!(
+                    "embedded asset not found: {relative_path}"
+                )))
+            })?;
+        return Ok(bytes.to_vec());
+    }
+
     let path = specifier_to_path(&specifier).map_err(|error| {
         OpError::from(std::io::Error::other(error))
     })?;
@@ -82,6 +104,14 @@ fn op_pulseq_read_file_bytes(
 fn op_pulseq_read_file_text(
     #[string] specifier: String,
 ) -> Result<String, OpError> {
+    if let Some(relative_path) = embedded_asset_path_from_specifier(&specifier) {
+        let embedded_runtime = EmbeddedRuntime::new();
+        let text = embedded_runtime.file_text(&relative_path).map_err(|error| {
+            OpError::from(std::io::Error::other(error))
+        })?;
+        return Ok(text.to_string());
+    }
+
     let path = specifier_to_path(&specifier).map_err(|error| {
         OpError::from(std::io::Error::other(error))
     })?;
@@ -157,6 +187,24 @@ fn op_pulseq_list_dir(
             .join(",")
     );
 
+    Ok(json)
+}
+
+#[op2]
+#[string]
+fn op_pulseq_list_embedded_files(
+    #[string] prefix: String,
+) -> Result<String, OpError> {
+    let embedded_runtime = EmbeddedRuntime::new();
+    let json = format!(
+        "[{}]",
+        embedded_runtime
+            .list_files(&prefix)
+            .iter()
+            .map(|path| js_string(path))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
     Ok(json)
 }
 
@@ -289,6 +337,7 @@ extension!(
         op_pulseq_read_file_text,
         op_pulseq_log,
         op_pulseq_list_dir,
+        op_pulseq_list_embedded_files,
         op_pulseq_resolve_url,
         op_pulseq_btoa,
         op_pulseq_atob,
@@ -300,7 +349,7 @@ extension!(
 pub fn run_cli_request(
     request_json: &str,
     plan: &NativeBootstrapPlan,
-    runtime_paths: &RuntimePaths,
+    embedded_runtime: &EmbeddedRuntime,
 ) -> Result<(), String> {
     let request_value = serde_json::from_str::<serde_json::Value>(request_json)
         .map_err(|error| format!("failed to parse request JSON for native host state: {error}"))?;
@@ -321,7 +370,9 @@ pub fn run_cli_request(
         .build()
         .map_err(|error| format!("failed to build tokio runtime for deno_core: {error}"))?;
 
-    let result = runtime.block_on(async move { run_cli_request_async(request_json, plan, runtime_paths).await });
+    let result = runtime.block_on(async move {
+        run_cli_request_async(request_json, plan, *embedded_runtime).await
+    });
     clear_native_op_state();
     result
 }
@@ -329,16 +380,16 @@ pub fn run_cli_request(
 async fn run_cli_request_async(
     request_json: &str,
     plan: &NativeBootstrapPlan,
-    runtime_paths: &RuntimePaths,
+    embedded_runtime: EmbeddedRuntime,
 ) -> Result<(), String> {
-    let module_loader = Rc::new(FsModuleLoader);
+    let module_loader = Rc::new(EmbeddedModuleLoader::new(embedded_runtime));
     let mut runtime = JsRuntime::new(RuntimeOptions {
         module_loader: Some(module_loader),
         extensions: vec![pulseq_cli_host::init_ops()],
         ..Default::default()
     });
-    let entry_specifier = entry_module_specifier(runtime_paths)?;
-    let source = build_entry_module_source(request_json, plan, runtime_paths);
+    let entry_specifier = entry_module_specifier()?;
+    let source = build_entry_module_source(request_json, plan);
 
     let module_id = runtime
         .load_main_es_module_from_code(&entry_specifier, source)
@@ -359,25 +410,17 @@ async fn run_cli_request_async(
 fn build_entry_module_source(
     request_json: &str,
     plan: &NativeBootstrapPlan,
-    runtime_paths: &RuntimePaths,
 ) -> String {
-    let pyodide_root_url = ensure_trailing_slash(&file_url(
-        runtime_paths
-            .pyodide_entrypoint
-            .parent()
-            .expect("validated pyodide entrypoint should have a parent"),
-    )
-    .expect("runtime paths were validated before bootstrap"));
-    let pyodide_module_url = file_url(&runtime_paths.pyodide_entrypoint)
-        .expect("runtime paths were validated before bootstrap");
+    let pyodide_root_url = ensure_trailing_slash(&embedded_asset_url("pyodide/pyodide"));
+    let pyodide_module_url = embedded_asset_url("pyodide/pyodide/pyodide.mjs");
 
     let mount_lines = plan
         .mounts
         .iter()
         .map(|mount| {
             format!(
-                "  {{ source: {}, target: {} }},",
-                js_string(&mount.source.to_string_lossy()),
+                "  {{ assetPrefix: {}, target: {} }},",
+                js_string(&mount.asset_prefix),
                 js_string(&mount.target)
             )
         })
@@ -454,6 +497,7 @@ fn build_entry_module_source(
             "  }};\n",
             "}};\n",
             "globalThis.__pulseqNativeBootstrap = {{\n",
+            "  assetOrigin: {asset_origin},\n",
             "  pyodideRootUrl: {pyodide_root_url},\n",
             "  pyodideModuleUrl: {pyodide_module_url},\n",
             "  request: JSON.parse({request_json_literal}),\n",
@@ -463,6 +507,19 @@ fn build_entry_module_source(
             "}};\n",
             "const request = globalThis.__pulseqNativeBootstrap.request;\n",
             "const __pulseqNativeBasename = (value) => String(value).split(/[\\\\/]/).pop() || 'script.py';\n",
+            "const __pulseqStageEmbeddedPrefix = (pyodide, assetPrefix, targetRoot) => {{\n",
+            "  const files = JSON.parse(__denoCore.ops.op_pulseq_list_embedded_files(assetPrefix));\n",
+            "  for (const assetPath of files) {{\n",
+            "    const relativePath = assetPath.slice(assetPrefix.length).replace(/^\\/+/, '');\n",
+            "    const targetPath = relativePath ? (targetRoot + '/' + relativePath) : targetRoot;\n",
+            "    const lastSlash = targetPath.lastIndexOf('/');\n",
+            "    if (lastSlash > 0) {{\n",
+            "      pyodide.FS.mkdirTree(targetPath.slice(0, lastSlash));\n",
+            "    }}\n",
+            "    const bytes = __denoCore.ops.op_pulseq_read_file_bytes(globalThis.__pulseqNativeBootstrap.assetOrigin + assetPath);\n",
+            "    pyodide.FS.writeFile(targetPath, bytes);\n",
+            "  }}\n",
+            "}};\n",
             "const __pulseqStageTree = (pyodide, hostRoot, targetRoot) => {{\n",
             "  pyodide.FS.mkdirTree(targetRoot);\n",
             "  let entries;\n",
@@ -537,7 +594,7 @@ fn build_entry_module_source(
             "}}\n",
             "await pyodide.loadPackage(['numpy', 'matplotlib', 'scipy']);\n",
             "for (const mount of globalThis.__pulseqNativeBootstrap.mounts) {{\n",
-            "  __pulseqStageTree(pyodide, mount.source, mount.target);\n",
+            "  __pulseqStageEmbeddedPrefix(pyodide, mount.assetPrefix, mount.target);\n",
             "}}\n",
             "const workspaceRoot = '/workspace';\n",
             "pyodide.FS.mkdirTree(workspaceRoot);\n",
@@ -556,6 +613,7 @@ fn build_entry_module_source(
             "pyodide.runPython({python_entrypoint});\n",
             "__pulseqLog('info', 'Native execution finished');\n"
         ),
+        asset_origin = js_string(EMBEDDED_RUNTIME_ORIGIN),
         pyodide_root_url = js_string(&pyodide_root_url),
         pyodide_module_url = js_string(&pyodide_module_url),
         request_json_literal = js_string(request_json),
@@ -573,18 +631,9 @@ fn build_entry_module_source(
     )
 }
 
-fn entry_module_specifier(runtime_paths: &RuntimePaths) -> Result<ModuleSpecifier, String> {
-    ModuleSpecifier::parse(&format!(
-        "file://{}/__pulseq_native_entry.js",
-        runtime_paths.root.display()
-    ))
+fn entry_module_specifier() -> Result<ModuleSpecifier, String> {
+    ModuleSpecifier::parse(&embedded_asset_url("__pulseq_native_entry.js"))
     .map_err(|error| format!("failed to build native entry module specifier: {error}"))
-}
-
-fn file_url(path: &Path) -> Result<String, String> {
-    ModuleSpecifier::from_file_path(path)
-        .map(|specifier| specifier.to_string())
-        .map_err(|_| format!("failed to convert path to file URL: {}", path.display()))
 }
 
 fn specifier_to_path(specifier: &str) -> Result<std::path::PathBuf, String> {
@@ -621,5 +670,62 @@ fn ensure_trailing_slash(value: &str) -> String {
         value.to_string()
     } else {
         format!("{value}/")
+    }
+}
+
+#[derive(Debug)]
+struct EmbeddedModuleLoader {
+    embedded_runtime: EmbeddedRuntime,
+}
+
+impl EmbeddedModuleLoader {
+    fn new(embedded_runtime: EmbeddedRuntime) -> Self {
+        Self { embedded_runtime }
+    }
+}
+
+impl ModuleLoader for EmbeddedModuleLoader {
+    fn resolve(
+        &self,
+        specifier: &str,
+        referrer: &str,
+        _kind: ResolutionKind,
+    ) -> Result<ModuleSpecifier, ModuleLoaderError> {
+        if referrer.is_empty() {
+            return ModuleSpecifier::parse(specifier).map_err(|error| {
+                ModuleLoaderError::from(std::io::Error::other(format!(
+                    "failed to parse module specifier {specifier}: {error}"
+                )))
+            });
+        }
+
+        resolve_import(specifier, referrer).map_err(ModuleLoaderError::from)
+    }
+
+    fn load(
+        &self,
+        module_specifier: &ModuleSpecifier,
+        maybe_referrer: Option<&ModuleSpecifier>,
+        _is_dyn_import: bool,
+        _requested_module_type: RequestedModuleType,
+    ) -> ModuleLoadResponse {
+        let Some(relative_path) = embedded_asset_path_from_specifier(module_specifier.as_str()) else {
+            return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Unsupported {
+                specifier: Box::new(module_specifier.clone()),
+                maybe_referrer: maybe_referrer.map(|referrer| Box::new(referrer.clone())),
+            }));
+        };
+
+        let source = match self.embedded_runtime.file_text(&relative_path) {
+            Ok(source) => source,
+            Err(_) => return ModuleLoadResponse::Sync(Err(ModuleLoaderError::NotFound)),
+        };
+
+        ModuleLoadResponse::Sync(Ok(ModuleSource::new(
+            ModuleType::JavaScript,
+            ModuleSourceCode::String(source.to_string().into()),
+            module_specifier,
+            None,
+        )))
     }
 }

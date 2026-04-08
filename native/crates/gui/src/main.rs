@@ -1,5 +1,3 @@
-use pypulseq_native_core::assets::RuntimePaths;
-
 fn main() {
     if let Err(error) = run() {
         eprintln!("{error}");
@@ -8,35 +6,23 @@ fn main() {
 }
 
 fn run() -> Result<(), String> {
-    let executable_path = std::env::current_exe()
-        .map_err(|error| format!("failed to resolve current executable path: {error}"))?;
-    let runtime_paths = RuntimePaths::locate_from_executable(executable_path)?;
-    runtime_paths.validate_for_gui()?;
-
-    launch_gui(runtime_paths)
+    launch_gui()
 }
 
 #[cfg(not(target_os = "windows"))]
-fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
+fn launch_gui() -> Result<(), String> {
     println!("{}", pypulseq_native_core::banner("gui"));
-    println!("runtime root: {}", runtime_paths.root.display());
-    println!("runtime manifest: {}", runtime_paths.manifest_path.display());
-    println!("pyodide dir: {}", runtime_paths.pyodide_dir.display());
-    println!("python packages dir: {}", runtime_paths.python_packages_dir.display());
-    println!(
-        "shared python runtime dir: {}",
-        runtime_paths.python_runtime_dir.display()
-    );
-    println!("gui assets dir: {}", runtime_paths.gui_dir.display());
+    println!("runtime=embedded");
     println!("GUI host is only implemented on Windows.");
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
-fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
+fn launch_gui() -> Result<(), String> {
     use std::borrow::Cow;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
+    use pypulseq_native_core::assets::{EmbeddedRuntime, GUI_DIR_NAME, PYTHON_PACKAGES_ARCHIVE_NAME};
     use tao::event::{Event, WindowEvent};
     use tao::event_loop::{ControlFlow, EventLoop};
     use tao::window::WindowBuilder;
@@ -63,25 +49,25 @@ fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
         }
     }
 
-    fn resolve_request_path(runtime_paths: &RuntimePaths, path: &str) -> PathBuf {
+    fn resolve_request_path(path: &str) -> String {
         let trimmed = path.trim_start_matches('/');
         if trimmed.is_empty() {
-            return runtime_paths.gui_index_html.clone();
+            return format!("{GUI_DIR_NAME}/index.html");
         }
-        if trimmed.starts_with("pyodide/") || trimmed == "python_packages.zip" {
-            return runtime_paths.root.join(trimmed);
+        if trimmed.starts_with("pyodide/") || trimmed == PYTHON_PACKAGES_ARCHIVE_NAME {
+            return trimmed.to_string();
         }
-        runtime_paths.gui_dir.join(trimmed)
+        format!("{GUI_DIR_NAME}/{trimmed}")
     }
 
-    fn response_from_path(path: &Path) -> Response<Cow<'static, [u8]>> {
-        match std::fs::read(path) {
-            Ok(bytes) => {
-                let mut response = Response::new(Cow::Owned(bytes));
+    fn response_from_path(runtime: &EmbeddedRuntime, relative_path: &str) -> Response<Cow<'static, [u8]>> {
+        match runtime.file_bytes(relative_path) {
+            Some(bytes) => {
+                let mut response = Response::new(Cow::Borrowed(bytes));
                 *response.status_mut() = StatusCode::OK;
                 response.headers_mut().insert(
                     CONTENT_TYPE,
-                    HeaderValue::from_static(mime_for(path)),
+                    HeaderValue::from_static(mime_for(Path::new(relative_path))),
                 );
                 response
             }
@@ -104,16 +90,13 @@ fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
         .build(&event_loop)
         .map_err(|error| format!("failed to create GUI window: {error}"))?;
 
-    let protocol_runtime = runtime_paths.clone();
+    let embedded_runtime = EmbeddedRuntime::new();
     let _webview = WebViewBuilder::new()
-        .with_custom_protocol("pypulseq".into(), move |request: Request<Vec<u8>>| {
-            Ok::<_, Box<dyn std::error::Error>>(response_from_path(&resolve_request_path(
-                &protocol_runtime,
-                request.uri().path(),
-            )))
+        .with_custom_protocol("pypulseq".into(), move |_webview_id, request: Request<Vec<u8>>| {
+            let relative_path = resolve_request_path(request.uri().path());
+            Ok::<_, Box<dyn std::error::Error>>(response_from_path(&embedded_runtime, &relative_path))
         })
         .with_url("http://pypulseq/index.html")
-        .map_err(|error| format!("failed to configure GUI URL: {error}"))?
         .build(&window)
         .map_err(|error| format!("failed to build GUI WebView: {error}"))?;
 

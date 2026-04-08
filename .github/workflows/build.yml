@@ -92,13 +92,8 @@ jobs:
       - name: Stage CLI bundle
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path native/out/pypulseq-cli/runtime | Out-Null
+          New-Item -ItemType Directory -Force -Path native/out/pypulseq-cli | Out-Null
           Copy-Item native/target/release/pypulseq-cli.exe native/out/pypulseq-cli/
-          Copy-Item -Recurse native/runtime/pyodide native/out/pypulseq-cli/runtime/
-          Copy-Item -Recurse native/runtime/python_packages native/out/pypulseq-cli/runtime/
-          Copy-Item native/runtime/python_packages.zip native/out/pypulseq-cli/runtime/
-          Copy-Item -Recurse native/runtime/python_runtime native/out/pypulseq-cli/runtime/
-          Copy-Item native/runtime/manifest.json native/out/pypulseq-cli/runtime/
 
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
@@ -147,14 +142,8 @@ jobs:
       - name: Stage GUI bundle
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path native/out/pypulseq-gui/runtime | Out-Null
+          New-Item -ItemType Directory -Force -Path native/out/pypulseq-gui | Out-Null
           Copy-Item native/target/release/pypulseq-gui.exe native/out/pypulseq-gui/
-          Copy-Item -Recurse native/runtime/pyodide native/out/pypulseq-gui/runtime/
-          Copy-Item -Recurse native/runtime/python_packages native/out/pypulseq-gui/runtime/
-          Copy-Item native/runtime/python_packages.zip native/out/pypulseq-gui/runtime/
-          Copy-Item -Recurse native/runtime/python_runtime native/out/pypulseq-gui/runtime/
-          Copy-Item native/runtime/manifest.json native/out/pypulseq-gui/runtime/
-          Copy-Item -Recurse native/runtime/gui native/out/pypulseq-gui/runtime/
 
       - name: Upload GUI artifact
         uses: actions/upload-artifact@v4

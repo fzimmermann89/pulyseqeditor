@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::assets::RuntimePaths;
+use crate::assets::{
+    PYTHON_PACKAGES_DIR_NAME, PYTHON_RUNTIME_DIR_NAME, embedded_runtime,
+};
 use crate::host::NativeHost;
 use crate::pyodide_host::run_cli_request;
 
@@ -23,12 +25,6 @@ pub enum HostEvent {
 
 #[derive(Debug, Clone)]
 pub struct RunSummary {
-    pub runtime_root: PathBuf,
-    pub pyodide_dir: PathBuf,
-    pub python_packages_dir: PathBuf,
-    pub python_runtime_dir: PathBuf,
-    pub python_runtime_entrypoint: PathBuf,
-    pub manifest_path: PathBuf,
     pub bootstrap_plan: NativeBootstrapPlan,
 }
 
@@ -40,7 +36,7 @@ pub struct NativeInvocation {
 
 #[derive(Debug, Clone)]
 pub struct HostMount {
-    pub source: PathBuf,
+    pub asset_prefix: String,
     pub target: String,
 }
 
@@ -128,16 +124,15 @@ pub fn build_native_invocation(request: &RunRequest) -> NativeInvocation {
 
 pub fn build_native_bootstrap_plan(
     request: &RunRequest,
-    runtime_paths: &RuntimePaths,
 ) -> NativeBootstrapPlan {
     let invocation = build_native_invocation(request);
     let mounts = vec![
         HostMount {
-            source: runtime_paths.python_runtime_dir.clone(),
+            asset_prefix: format!("{PYTHON_RUNTIME_DIR_NAME}/"),
             target: PYTHON_RUNTIME_FS_ROOT.to_string(),
         },
         HostMount {
-            source: runtime_paths.python_packages_dir.clone(),
+            asset_prefix: format!("{PYTHON_PACKAGES_DIR_NAME}/"),
             target: PYTHON_PACKAGES_FS_ROOT.to_string(),
         },
     ];
@@ -162,16 +157,15 @@ pub fn build_native_bootstrap_plan(
 
 pub fn run_python_script(
     request: &RunRequest,
-    runtime_paths: &RuntimePaths,
     host: &mut dyn NativeHost,
 ) -> Result<RunSummary, String> {
-    runtime_paths.validate_for_cli()?;
     let invocation = build_native_invocation(request);
-    let bootstrap_plan = build_native_bootstrap_plan(request, runtime_paths);
+    let bootstrap_plan = build_native_bootstrap_plan(request);
+    let embedded_assets = embedded_runtime();
 
     host.emit(HostEvent::Log {
         stream: "info".to_string(),
-        text: format!("runtime={}", runtime_paths.root.display()),
+        text: "runtime=embedded".to_string(),
     });
     host.emit(HostEvent::Log {
         stream: "info".to_string(),
@@ -191,20 +185,14 @@ pub fn run_python_script(
     host.emit(HostEvent::Log {
         stream: "info".to_string(),
         text: format!(
-            "bootstrap_plan mounts={} entrypoint={} lines",
+            "bootstrap_plan embedded_mounts={} entrypoint={} lines",
             bootstrap_plan.mounts.len(),
             bootstrap_plan.python_entrypoint.lines().count()
         ),
     });
-    run_cli_request(&invocation.request_json, &bootstrap_plan, runtime_paths)?;
+    run_cli_request(&invocation.request_json, &bootstrap_plan, &embedded_assets)?;
 
     Ok(RunSummary {
-        runtime_root: runtime_paths.root.clone(),
-        pyodide_dir: runtime_paths.pyodide_dir.clone(),
-        python_packages_dir: runtime_paths.python_packages_dir.clone(),
-        python_runtime_dir: runtime_paths.python_runtime_dir.clone(),
-        python_runtime_entrypoint: runtime_paths.python_runtime_entrypoint.clone(),
-        manifest_path: runtime_paths.manifest_path.clone(),
         bootstrap_plan,
     })
 }

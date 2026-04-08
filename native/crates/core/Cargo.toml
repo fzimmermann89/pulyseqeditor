@@ -11,5 +11,6 @@ path = "src/lib.rs"
 [dependencies]
 base64.workspace = true
 deno_core.workspace = true
+include_dir = "0.7.4"
 serde_json.workspace = true
 tokio.workspace = true
