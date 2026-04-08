@@ -67,6 +67,20 @@ button {
   grid-template-rows: var(--header-h) 1fr auto;
   height: 100vh;
   overflow: hidden;
+  position: relative;
+}
+
+.app-layout-dragging::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px dashed rgba(232, 160, 69, 0.55);
+  pointer-events: none;
+  z-index: 40;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 /* ─── Header ──────────────────────────────────────────── */
@@ -147,6 +161,29 @@ button {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 17, 23, 0.72);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  pointer-events: none;
+}
+
+.drop-overlay-card {
+  padding: 1rem 1.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 160, 69, 0.35);
+  background: rgba(19, 21, 31, 0.92);
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  font-weight: 500;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 /* ─── Status Indicator (in header) ────────────────────── */

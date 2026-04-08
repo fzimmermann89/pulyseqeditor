@@ -1,6 +1,6 @@
 # pulseq editor
 
-Browser-based editor for running `pypulseq` code with Pyodide.
+Tools for running `pypulseq` code with Pyodide in the browser and on Windows.
 
 Live app:  
 https://fzimmermann89.github.io/pulyseqeditor/
@@ -8,14 +8,16 @@ https://fzimmermann89.github.io/pulyseqeditor/
 Upstream `pypulseq`:  
 https://github.com/imr-framework/pypulseq
 
-## What it does
+## Outputs
 
-- runs Python in the browser with Pyodide
-- loads `numpy`, `matplotlib`, `pypulseq`, etc
-- renders `matplotlib` output in a separate plot window
-- intercepts `Sequence.write(...)` and downloads `.seq` files directly in the browser
+- Web app
+  Runs Python in the browser with Pyodide, shows `matplotlib` plots in a separate plot window, and intercepts `Sequence.write(...)` for browser downloads.
+- `pypulseq-cli.exe`
+  Runs a Python script with embedded Pyodide on Windows. `matplotlib` figures are written as `figure1.png`, `figure2.png`, ... and `.seq` files are written to disk.
+- `pypulseq-gui.exe`
+  Runs the same editor UI in a native Windows window using WebView2.
 
-## Build and run
+## Build
 
 Requirements:
 
@@ -42,9 +44,49 @@ Build for production:
 npm run build
 ```
 
+Build the native asset bundle used by the Windows binaries:
+
+```bash
+npm run build:native-assets
+```
+
+Build the Rust native binaries:
+
+```bash
+cd native
+cargo build --release -p pypulseq-cli -p pypulseq-gui
+```
+
+## Use
+
+Web app:
+
+```bash
+npm run dev
+```
+
 Preview the production build locally:
 
 ```bash
 npm run preview
 ```
 
+CLI:
+
+```bash
+pypulseq-cli script.py
+```
+
+Optional flags:
+
+- `--output-dir DIR`
+- `--copy PATH`
+- `--verbose`
+
+GUI:
+
+```bash
+pypulseq-gui
+```
+
+The native GUI uses the embedded frontend assets and requires an installed WebView2 runtime on Windows.

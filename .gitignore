@@ -6,6 +6,8 @@ tsconfig.tsbuildinfo
 public/pyodide/
 public/python_packages/
 public/python_packages.zip
+native/target/
+native/runtime/
 
 .codex
 .cursor/

@@ -1,0 +1,12 @@
+[package]
+name = "pypulseq-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pypulseq-native-core = { path = "../core" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+tao = "0.30.8"
+wry = "0.48.1"

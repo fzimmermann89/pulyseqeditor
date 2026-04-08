@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,8 +9,6 @@ const buildPackagesRoot = path.join(appRoot, ".cache", "python_packages");
 const extractRoot = path.join(appRoot, ".cache", "pypulseq-src");
 const targetPackageRoot = path.join(buildPackagesRoot, "pypulseq");
 const archivePath = path.join(appRoot, "public", "python_packages.zip");
-const execFileAsync = promisify(execFile);
-
 const EXCLUDED_DIRS = new Set([
   "__pycache__",
   ".mypy_cache",
@@ -101,12 +97,128 @@ async function writeDistInfo(version) {
   await writeFile(path.join(distInfoDir, "RECORD"), "", "utf8");
 }
 
+function buildCrc32Table() {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    let crc = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 1) !== 0 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+    }
+    table[index] = crc >>> 0;
+  }
+  return table;
+}
+
+const CRC32_TABLE = buildCrc32Table();
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function toDosDateTime(date) {
+  const year = Math.max(1980, date.getUTCFullYear());
+  const month = date.getUTCMonth() + 1;
+  const day = date.getUTCDate();
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  const seconds = Math.floor(date.getUTCSeconds() / 2);
+
+  const dosTime = (hours << 11) | (minutes << 5) | seconds;
+  const dosDate = ((year - 1980) << 9) | (month << 5) | day;
+  return { dosTime, dosDate };
+}
+
+async function collectFiles(rootDir, currentDir = rootDir) {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const fullPath = path.join(currentDir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectFiles(rootDir, fullPath)));
+      continue;
+    }
+    if (!entry.isFile()) {
+      continue;
+    }
+    const relativePath = path.relative(rootDir, fullPath).split(path.sep).join("/");
+    files.push({ fullPath, relativePath });
+  }
+
+  files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  return files;
+}
+
 async function writeArchive() {
   await rm(archivePath, { force: true });
   await mkdir(path.dirname(archivePath), { recursive: true });
-  await execFileAsync("zip", ["-qr", archivePath, "."], {
-    cwd: buildPackagesRoot,
-  });
+
+  const files = await collectFiles(buildPackagesRoot);
+  const chunks = [];
+  const centralDirectory = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const fileBytes = await readFile(file.fullPath);
+    const nameBytes = Buffer.from(file.relativePath, "utf8");
+    const stats = await stat(file.fullPath);
+    const { dosTime, dosDate } = toDosDateTime(stats.mtime);
+    const checksum = crc32(fileBytes);
+
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(0x04034b50, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt16LE(0, 6);
+    localHeader.writeUInt16LE(0, 8);
+    localHeader.writeUInt16LE(dosTime, 10);
+    localHeader.writeUInt16LE(dosDate, 12);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(fileBytes.length, 18);
+    localHeader.writeUInt32LE(fileBytes.length, 22);
+    localHeader.writeUInt16LE(nameBytes.length, 26);
+    localHeader.writeUInt16LE(0, 28);
+
+    chunks.push(localHeader, nameBytes, fileBytes);
+
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(0, 8);
+    centralHeader.writeUInt16LE(0, 10);
+    centralHeader.writeUInt16LE(dosTime, 12);
+    centralHeader.writeUInt16LE(dosDate, 14);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(fileBytes.length, 20);
+    centralHeader.writeUInt32LE(fileBytes.length, 24);
+    centralHeader.writeUInt16LE(nameBytes.length, 28);
+    centralHeader.writeUInt16LE(0, 30);
+    centralHeader.writeUInt16LE(0, 32);
+    centralHeader.writeUInt16LE(0, 34);
+    centralHeader.writeUInt16LE(0, 36);
+    centralHeader.writeUInt32LE(0, 38);
+    centralHeader.writeUInt32LE(offset, 42);
+    centralDirectory.push(centralHeader, nameBytes);
+
+    offset += localHeader.length + nameBytes.length + fileBytes.length;
+  }
+
+  const centralDirectorySize = centralDirectory.reduce((size, chunk) => size + chunk.length, 0);
+  const endOfCentralDirectory = Buffer.alloc(22);
+  endOfCentralDirectory.writeUInt32LE(0x06054b50, 0);
+  endOfCentralDirectory.writeUInt16LE(0, 4);
+  endOfCentralDirectory.writeUInt16LE(0, 6);
+  endOfCentralDirectory.writeUInt16LE(files.length, 8);
+  endOfCentralDirectory.writeUInt16LE(files.length, 10);
+  endOfCentralDirectory.writeUInt32LE(centralDirectorySize, 12);
+  endOfCentralDirectory.writeUInt32LE(offset, 16);
+  endOfCentralDirectory.writeUInt16LE(0, 20);
+
+  await writeFile(archivePath, Buffer.concat([...chunks, ...centralDirectory, endOfCentralDirectory]));
 }
 
 async function main() {
