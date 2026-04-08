@@ -96,7 +96,7 @@ fn launch_gui() -> Result<(), String> {
             let relative_path = resolve_request_path(request.uri().path());
             response_from_path(&embedded_runtime, &relative_path)
         })
-        .with_url("http://pypulseq/index.html")
+        .with_url("pypulseq://localhost/")
         .build(&window)
         .map_err(|error| format!("failed to build GUI WebView: {error}"))?;
 
