@@ -1,6 +1,15 @@
 import { loadPyodide } from "pyodide";
 import bootstrapSource from "../py/bootstrap.py?raw";
 import loadPypulseqSource from "../py/load_pypulseq.py?raw";
+import runtimeInitSource from "../python_runtime/pypulseq_runtime/__init__.py?raw";
+import runtimeBridgeApiSource from "../python_runtime/pypulseq_runtime/bridge_api.py?raw";
+import runtimeExecutionSource from "../python_runtime/pypulseq_runtime/execution.py?raw";
+import runtimeHostSource from "../python_runtime/pypulseq_runtime/host.py?raw";
+import runtimePatchMatplotlibSource from "../python_runtime/pypulseq_runtime/patch_matplotlib.py?raw";
+import runtimePatchPypulseqSource from "../python_runtime/pypulseq_runtime/patch_pypulseq.py?raw";
+import runtimeRuntimeSource from "../python_runtime/pypulseq_runtime/runtime.py?raw";
+import runtimeWebHostSource from "../python_runtime/pypulseq_runtime/web_host.py?raw";
+import runtimeWebBootstrapSource from "../python_runtime/pypulseq_runtime/web_bootstrap.py?raw";
 
 type PyodideInterface = {
   FS: {
@@ -21,27 +30,30 @@ const PYODIDE_BASE = `${BASE_URL}pyodide/pyodide`;
 const PYTHON_PACKAGES_FS_ROOT = "/app/python_packages";
 const PYTHON_PACKAGES_ARCHIVE_PUBLIC_PATH = `${BASE_URL}python_packages.zip`;
 const PYTHON_PACKAGES_ARCHIVE_FS_PATH = "/app/python_packages.zip";
+const SHARED_RUNTIME_ROOT = "/app/pypulseq_runtime";
+
+const SHARED_RUNTIME_FILES = [
+  { path: `${SHARED_RUNTIME_ROOT}/__init__.py`, source: runtimeInitSource },
+  { path: `${SHARED_RUNTIME_ROOT}/bridge_api.py`, source: runtimeBridgeApiSource },
+  { path: `${SHARED_RUNTIME_ROOT}/execution.py`, source: runtimeExecutionSource },
+  { path: `${SHARED_RUNTIME_ROOT}/host.py`, source: runtimeHostSource },
+  { path: `${SHARED_RUNTIME_ROOT}/patch_matplotlib.py`, source: runtimePatchMatplotlibSource },
+  { path: `${SHARED_RUNTIME_ROOT}/patch_pypulseq.py`, source: runtimePatchPypulseqSource },
+  { path: `${SHARED_RUNTIME_ROOT}/runtime.py`, source: runtimeRuntimeSource },
+  { path: `${SHARED_RUNTIME_ROOT}/web_host.py`, source: runtimeWebHostSource },
+  { path: `${SHARED_RUNTIME_ROOT}/web_bootstrap.py`, source: runtimeWebBootstrapSource },
+] as const;
 
 const PRE_RUN = `
-import io
-import traceback
-import matplotlib.pyplot as plt
-from pyodide.ffi import to_js
+from pypulseq_runtime.execution import reset_run_state
 
-_pybridge_state["show_called"] = False
-plt.close("all")
+reset_run_state(_pybridge_state)
 `;
 
 const USER_RUN = `
-import traceback
-import matplotlib.pyplot as plt
+from pypulseq_runtime.execution import execute_user_code
 
-try:
-    exec(__user_code__, globals(), globals())
-    if not _pybridge_state.get("show_called", False):
-        _export_open_figures()
-except Exception:
-    traceback.print_exc()
+execute_user_code(__user_code__, globals(), _pybridge_state, _export_open_figures)
 `;
 
 // Typed handle to the worker global for postMessage and custom properties
@@ -96,6 +108,13 @@ async function loadBytes(path: string) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
+function stageSharedRuntime(pyodide: PyodideInterface) {
+  pyodide.FS.mkdirTree(SHARED_RUNTIME_ROOT);
+  for (const file of SHARED_RUNTIME_FILES) {
+    pyodide.FS.writeFile(file.path, file.source, { encoding: "utf8" });
+  }
+}
+
 let pyodidePromise: Promise<PyodideInterface> | null = null;
 
 async function initializePyodide(): Promise<PyodideInterface> {
@@ -106,6 +125,7 @@ async function initializePyodide(): Promise<PyodideInterface> {
   await pyodide.loadPackage(["numpy", "matplotlib", "scipy"]);
 
   postStatus("loading-pypulseq", "Loading pypulseq");
+  stageSharedRuntime(pyodide);
   pyodide.FS.mkdirTree(PYTHON_PACKAGES_FS_ROOT);
   const archiveBytes = await loadBytes(PYTHON_PACKAGES_ARCHIVE_PUBLIC_PATH);
   pyodide.FS.writeFile(PYTHON_PACKAGES_ARCHIVE_FS_PATH, archiveBytes);
