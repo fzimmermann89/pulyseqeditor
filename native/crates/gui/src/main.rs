@@ -101,8 +101,8 @@ fn launch_gui() -> Result<(), String> {
                 response_from_path(&embedded_runtime, &relative_path)
             }
         })
-        .with_ipc_handler(|_window, message| {
-            eprintln!("GUI IPC: {message}");
+        .with_ipc_handler(|request: Request<String>| {
+            eprintln!("GUI IPC: {}", request.body());
         })
         .with_initialization_script(
             r#"
