@@ -37,12 +37,12 @@ fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
     use std::borrow::Cow;
     use std::path::{Path, PathBuf};
 
-    use wry::application::event::{Event, WindowEvent};
-    use wry::application::event_loop::{ControlFlow, EventLoop};
-    use wry::application::window::WindowBuilder;
+    use tao::event::{Event, WindowEvent};
+    use tao::event_loop::{ControlFlow, EventLoop};
+    use tao::window::WindowBuilder;
     use wry::http::header::{CONTENT_TYPE, HeaderValue};
-    use wry::http::{Response, StatusCode};
-    use wry::webview::WebViewBuilder;
+    use wry::http::{Request, Response, StatusCode};
+    use wry::WebViewBuilder;
 
     fn mime_for(path: &Path) -> &'static str {
         match path.extension().and_then(|ext| ext.to_str()).unwrap_or_default() {
@@ -105,17 +105,16 @@ fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
         .map_err(|error| format!("failed to create GUI window: {error}"))?;
 
     let protocol_runtime = runtime_paths.clone();
-    let _webview = WebViewBuilder::new(window)
-        .map_err(|error| format!("failed to create WebView builder: {error}"))?
-        .with_custom_protocol("pypulseq".into(), move |request| {
+    let _webview = WebViewBuilder::new()
+        .with_custom_protocol("pypulseq".into(), move |request: Request<Vec<u8>>| {
             Ok::<_, Box<dyn std::error::Error>>(response_from_path(&resolve_request_path(
                 &protocol_runtime,
                 request.uri().path(),
             )))
         })
-        .with_url("pypulseq://app/index.html")
+        .with_url("http://pypulseq/index.html")
         .map_err(|error| format!("failed to configure GUI URL: {error}"))?
-        .build()
+        .build(&window)
         .map_err(|error| format!("failed to build GUI WebView: {error}"))?;
 
     event_loop.run(move |event, _, control_flow| {
@@ -127,5 +126,5 @@ fn launch_gui(runtime_paths: RuntimePaths) -> Result<(), String> {
         {
             *control_flow = ControlFlow::Exit;
         }
-    });
+    })
 }
