@@ -71,7 +71,7 @@ fn launch_gui() -> Result<(), String> {
                 );
                 response
             }
-            Err(_) => {
+            None => {
                 let mut response =
                     Response::new(Cow::Borrowed(b"Not found" as &'static [u8]));
                 *response.status_mut() = StatusCode::NOT_FOUND;
@@ -94,7 +94,7 @@ fn launch_gui() -> Result<(), String> {
     let _webview = WebViewBuilder::new()
         .with_custom_protocol("pypulseq".into(), move |_webview_id, request: Request<Vec<u8>>| {
             let relative_path = resolve_request_path(request.uri().path());
-            Ok::<_, Box<dyn std::error::Error>>(response_from_path(&embedded_runtime, &relative_path))
+            response_from_path(&embedded_runtime, &relative_path)
         })
         .with_url("http://pypulseq/index.html")
         .build(&window)
