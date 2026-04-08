@@ -21,6 +21,7 @@ fn launch_gui() -> Result<(), String> {
 fn launch_gui() -> Result<(), String> {
     use std::borrow::Cow;
     use std::path::Path;
+    use std::sync::Arc;
 
     use pypulseq_native_core::assets::{EmbeddedRuntime, GUI_DIR_NAME, PYTHON_PACKAGES_ARCHIVE_NAME};
     use tao::event::{Event, WindowEvent};
@@ -72,6 +73,7 @@ fn launch_gui() -> Result<(), String> {
                 response
             }
             None => {
+                eprintln!("GUI asset not found: {relative_path}");
                 let mut response =
                     Response::new(Cow::Borrowed(b"Not found" as &'static [u8]));
                 *response.status_mut() = StatusCode::NOT_FOUND;
@@ -90,13 +92,38 @@ fn launch_gui() -> Result<(), String> {
         .build(&event_loop)
         .map_err(|error| format!("failed to create GUI window: {error}"))?;
 
-    let embedded_runtime = EmbeddedRuntime::new();
+    let embedded_runtime = Arc::new(EmbeddedRuntime::new());
     let _webview = WebViewBuilder::new()
-        .with_custom_protocol("pypulseq".into(), move |_webview_id, request: Request<Vec<u8>>| {
-            let relative_path = resolve_request_path(request.uri().path());
-            response_from_path(&embedded_runtime, &relative_path)
+        .with_custom_protocol("pypulseq".into(), {
+            let embedded_runtime = Arc::clone(&embedded_runtime);
+            move |_webview_id, request: Request<Vec<u8>>| {
+                let relative_path = resolve_request_path(request.uri().path());
+                response_from_path(&embedded_runtime, &relative_path)
+            }
         })
-        .with_url("pypulseq://localhost/")
+        .with_ipc_handler(|_window, message| {
+            eprintln!("GUI IPC: {message}");
+        })
+        .with_initialization_script(
+            r#"
+            window.addEventListener("error", (event) => {
+              const message = event.error?.stack || event.message || "unknown window error";
+              window.ipc.postMessage(`window-error:${message}`);
+            });
+            window.addEventListener("unhandledrejection", (event) => {
+              const reason = event.reason?.stack || event.reason?.message || String(event.reason);
+              window.ipc.postMessage(`unhandled-rejection:${reason}`);
+            });
+            const originalConsoleError = console.error.bind(console);
+            console.error = (...args) => {
+              try {
+                window.ipc.postMessage(`console-error:${args.map((value) => String(value)).join(" ")}`);
+              } catch (_) {}
+              originalConsoleError(...args);
+            };
+            "#,
+        )
+        .with_url("pypulseq://localhost/index.html")
         .build(&window)
         .map_err(|error| format!("failed to build GUI WebView: {error}"))?;
 
